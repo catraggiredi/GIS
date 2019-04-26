@@ -1,0 +1,111 @@
+---
+title: "Lab 1"
+output: html_document
+author: Catalina Raggi
+---
+
+To begin, make sure to have the following libraries installed on your device and called on in your document:
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(sf)
+library(raster)
+library(spData)
+library(devtools)
+library(tidyverse)
+```
+
+We can use the world data set that comes with the libraries. Let's make a copy of dataset "world" that we can then edit. We will also want to see what information this data set holds
+
+```{r}
+new_world <- world
+head(new_world)
+```
+
+This output is a bit clunky. Another way of looking at the data is through a summary of the columns
+
+```{r}
+summary(new_world)
+```
+
+One of the variables that may be of interest to us is that of population density. Although the variable itself does not exist in the data set, we have the needed information.
+
+```{r}
+#Divide the population over the area 
+new_world$dens <- new_world$pop / new_world$area_km2
+```
+
+Say we were only interested in looking at the top 50 places with the highest population densities. We can create a new ordered dataset and only save the top 50 values.
+
+```{r}
+dens<- new_world[with(new_world, order(dens)), ]
+top_dens<- dens[1:50, ]
+```
+
+This is our new data
+
+```{r}
+summary(top_dens)
+```
+
+Another alternative is to only look at places that meet a certain criteria. Lets take another look at the population density variable
+
+```{r}
+summary(new_world$dens)
+```
+
+We can see that the 3rd quartile is 126.0350. If we only wanted to look at countries with that value or higher, we could filter out the dataset based on the value of the dens variable
+
+```{r}
+top75<- new_world%>% filter(dens >= 126.035)
+summary(top75)
+```
+
+Another option is to only look at countries from a specific region. "Continent" is the name of a variable and can be used to subset the data. We can select only the countries where the continent name is "Africa" and save them into a new dataset with only the information for Africa.
+
+
+```{r}
+Africa <- new_world%>%
+filter(continent=="Africa")
+```
+
+This new object "Africa" is made up of various countries, but can also be combined and treated as one unit using st_combine. We can use st_centroids to find the center of the continent of Africa
+
+```{r}
+all_Africa <- st_geometry(st_combine(Africa))
+AfricaCenter <- st_centroid(all_Africa)
+```
+
+This brings us an error saying "st_centroid does not give correct centroids for longitude/latitude data". We need to transform the data. st_transform changes the geometry of the inputted spatial dataset so that it is in the desired form. In this case, we are using EPSG 3857 for the Mercator projection.
+
+```{r}
+Africa <- st_transform(Africa, 3857)
+```
+
+When we run the code again...
+
+```{r}
+all_Africa <- st_geometry(st_combine(Africa))
+AfricaCenter <- st_centroid(all_Africa)
+```
+We no longer get that error
+
+We can do a similar process to create centroids for all of the individual countries within Africa. We can define a variable "centroids" in the Africa dataset as being the centroids of the country's geometry.
+
+```{r}
+Africa$centroids<- st_centroid(st_geometry(Africa))
+```
+
+If we look at the columns of Africa, we can see that "centroids" is now in the dataset
+
+```{r}
+names(Africa)
+```
+
+Distances can be calculated using st_distance, which takes in two points and returns the distance between them. We can calculate the distance between the center of each country and the overall center of the continent and save that as a new variable.
+
+```{r}
+Africa$dist <- st_distance(Africa$centroids, AfricaCenter)
+```
+
+
